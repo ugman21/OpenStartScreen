@@ -1,4 +1,4 @@
-### Probably too much technical debt, ill restart working on this from scratch
+### OBSELETE, GO USE  [THIS](https://github.com/valinet/ExplorerPatcher/wiki/ExplorerPatcher%27s-taskbar-implementation) INSTEAD, ITS THE REAL AND FULL START SCREEN FOR WINDOWS 8
 
 # OpenStartScreen
 
