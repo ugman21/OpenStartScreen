@@ -1,19 +1,20 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Security.Principal;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Threading;
-using System.Linq;
-using System.Windows.Input;
 using System.Windows.Media.Imaging;
-using System.Security.Principal;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Windows.Media.Media3D;
+using System.Windows.Threading;
 
 
 namespace OpenStartScreen
@@ -21,6 +22,9 @@ namespace OpenStartScreen
     public partial class MainWindow : Window
     {
         private bool isZoomedOut = false;
+        private bool isApps = false;
+        DispatcherTimer dispatcherTimer = new DispatcherTimer();
+        private bool open = true;
         private ScaleTransform scaleTransform;
         private double targetVerticalOffset;
         private DateTime animationStartTime;
@@ -28,9 +32,17 @@ namespace OpenStartScreen
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern int SystemParametersInfo(int uAction, int uParam, StringBuilder lpvParam, int fuWinIni);
 
+        WindowInteropHelper wih;
         public MainWindow()
         {
+            // start info
+            Console.WriteLine("OpenStartScreen | Revised by actium_xyz\n" +
+                              "                | Originally Created by kolejker\n" +
+                              "                | V1.0\n\n\n\n");
+            
+
             InitializeComponent();
+
             LoadStartMenuItems();
             LoadPinnedItems();
             this.WindowState = WindowState.Maximized;
@@ -45,12 +57,97 @@ namespace OpenStartScreen
 
             GridsPanel.LayoutTransform = transformGroup;
             this.KeyDown += MainWindow_KeyDown;
+            this.Deactivated += MainWindow_LostFocus;
+            dispatcherTimer.Interval = TimeSpan.FromMilliseconds(20);
+            dispatcherTimer.Tick += DispatcherTimer_Tick;
+            dispatcherTimer.Start();
 
             GridsPanel.Drop += GridsPanel_Drop;
             GridsPanel.DragOver += GridsPanel_DragOver;
+
+            WindowsKey.MouseEnter += WindowsKey_MouseEnter;
+            WindowsKey.MouseLeave += WindowsKey_MouseLeave;
+
+            this.Activated += MainWindow_Activated;
+            CatagoriesScroll.PreviewMouseWheel += ScrollViewer_PreviewMouseWheel;
+            wih = new WindowInteropHelper(this);
+
         }
 
+        private void WindowsKey_MouseLeave(object sender, MouseEventArgs e)
+        {
+            WindowsKey.Visibility = Visibility.Collapsed;
+        }
 
+        private void WindowsKey_MouseEnter(object sender, MouseEventArgs e)
+        {
+            // Check if the mouse is near the corner where the button should appear
+            Point mousePosition = e.GetPosition(this);
+            double cornerThreshold = 0; // Adjust as needed
+
+            if (mousePosition.X > WindowsKey.ActualWidth - cornerThreshold &&
+                mousePosition.Y > WindowsKey.ActualHeight - cornerThreshold)
+            {
+                WindowsKey.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void ScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            ScrollViewer scv = (ScrollViewer)sender;
+            scv.ScrollToHorizontalOffset(scv.HorizontalOffset - e.Delta);
+            e.Handled = true;
+        }
+
+        private void MainWindow_Activated(object? sender, EventArgs e)
+        {
+            //
+        }
+
+        private void MainWindow_LostFocus(object? sender, EventArgs e)
+        {
+            //open = false;
+            this.Hide();
+            open = false;
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool SetForegroundWindow(IntPtr hWnd);
+        private void DispatcherTimer_Tick(object? sender, EventArgs e)
+        {
+            //Console.WriteLine("workojg");
+            Process[] pname = Process.GetProcessesByName("OpenLoader");
+            if (pname.Length >= 1)
+            {
+                if (open)
+                {
+                    if (isApps)
+                    {
+                        double newOffset = scrollViewer.VerticalOffset - scrollViewer.ViewportHeight;
+                        AnimateScrollViewer(scrollViewer, newOffset, TimeSpan.FromSeconds(1));
+                    }
+                    Console.WriteLine("Hiding...");
+                    open = false;
+                    this.Hide();
+                    Thread.Sleep(200);
+                }else
+                {
+                    Console.WriteLine("Showing...");
+                    this.Show();
+                    SetForegroundWindow(wih.Handle);
+                    open = true;
+                    Thread.Sleep(200);
+                }
+                // already open in bg, unhide it.
+                //dispatcherTimer.Stop();
+            }
+            else
+            {
+                // Void
+            }
+            //Thread.Sleep(200);
+        }
 
         private void MainWindow_KeyDown(object sender, KeyEventArgs e)
         {
@@ -120,12 +217,14 @@ namespace OpenStartScreen
 
         private void GoToApps_Click(object sender, RoutedEventArgs e)
         {
+            isApps = true;
             double newOffset = scrollViewer.VerticalOffset + scrollViewer.ViewportHeight;
             AnimateScrollViewer(scrollViewer, newOffset, TimeSpan.FromSeconds(1));
         }
 
         private void GoToStart_Click(object sender, RoutedEventArgs e)
         {
+            isApps = false;
             double newOffset = scrollViewer.VerticalOffset - scrollViewer.ViewportHeight;
             AnimateScrollViewer(scrollViewer, newOffset, TimeSpan.FromSeconds(1));
         }

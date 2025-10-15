@@ -42,7 +42,7 @@ public partial class MainWindow
             Name = "Desktop",
             Image = null,
             Background = new BitmapImage(new Uri(GetWallpaperPath())),
-            FilePath = "explorer.exe",
+            FilePath = "explorer[shell]",
             Size = TileSize.Default
         };
     }

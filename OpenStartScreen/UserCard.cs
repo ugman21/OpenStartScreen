@@ -36,6 +36,8 @@ public class UserCard : INotifyPropertyChanged
     public ICommand ChangeAccountPictureCommand { get; }
     public ICommand LockCommand { get; }
     public ICommand SignOutCommand { get; }
+    public ICommand ShutdownCommand { get; }
+    public ICommand RestartCommand { get; }
 
     public UserCard()
     {
@@ -46,7 +48,11 @@ public class UserCard : INotifyPropertyChanged
         ChangeAccountPictureCommand = new RelayCommand(ChangeAccountPicture);
         LockCommand = new RelayCommand(Lock);
         SignOutCommand = new RelayCommand(SignOut);
+        ShutdownCommand = new RelayCommand(Shutdown);
+        RestartCommand = new RelayCommand(Restart);
     }
+
+    
 
     private string GetUsername()
     {
@@ -116,12 +122,127 @@ public class UserCard : INotifyPropertyChanged
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool ExitWindowsEx(uint uFlags, uint dwReason);
+    enum ExitFlags
+    {
+        Logoff = 0,
+        Shutdown = 1,
+        Reboot = 2,
+        Force = 4,
+        PowerOff = 8,
+        ForceIfHung = 16
+    }
+    enum Reason : uint
+    {
+        ApplicationIssue = 0x00040000,
+        HardwareIssue = 0x00010000,
+        SoftwareIssue = 0x00030000,
+        PlannedShutdown = 0x80000000
+    }
+    const int PrivilegeEnabled = 0x00000002;
+    const int TokenQuery = 0x00000008;
+    const int AdjustPrivileges = 0x00000020;
+    const string ShutdownPrivilege = "SeShutdownPrivilege";
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    internal struct TokenPrivileges
+    {
+        public int PrivilegeCount;
+        public long Luid;
+        public int Attributes;
+    }
 
-    private const uint EWX_LOGOFF = 0x00000000;
+    [DllImport("kernel32.dll")]
+    internal static extern IntPtr GetCurrentProcess();
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    internal static extern int OpenProcessToken(
+        IntPtr processHandle,
+        int desiredAccess,
+        ref IntPtr tokenHandle);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    internal static extern int LookupPrivilegeValue(
+        string systemName, string name, ref long luid);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    internal static extern int AdjustTokenPrivileges(
+        IntPtr tokenHandle, bool disableAllPrivileges,
+        ref TokenPrivileges newState,
+        int bufferLength,
+        IntPtr previousState,
+        IntPtr length);
+    private void ElevatePrivileges()
+    {
+        IntPtr currentProcess = GetCurrentProcess();
+        IntPtr tokenHandle = IntPtr.Zero;
+
+        int result = OpenProcessToken(
+            currentProcess,
+            AdjustPrivileges | TokenQuery,
+            ref tokenHandle);
+
+        if (result == 0)
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+
+        TokenPrivileges tokenPrivileges;
+        tokenPrivileges.PrivilegeCount = 1;
+        tokenPrivileges.Luid = 0;
+        tokenPrivileges.Attributes = PrivilegeEnabled;
+
+        result = LookupPrivilegeValue(
+            null,
+            ShutdownPrivilege,
+            ref tokenPrivileges.Luid);
+
+        if (result == 0)
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+
+        result = AdjustTokenPrivileges(
+            tokenHandle,
+            false,
+            ref tokenPrivileges,
+            0, IntPtr.Zero,
+            IntPtr.Zero);
+
+        if (result == 0)
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+    }
 
     private void SignOut(object parameter)
     {
-        ExitWindowsEx(EWX_LOGOFF, 0);
+        ExitWindowsEx(0, 0);
+    }
+
+    private void Restart(object obj)
+    {
+        /* 
+        Logoff = 0
+        Shutdown = 1
+        Reboot = 2
+        ForceLogOff = 4
+        ForceReboot = 6
+        PowerDown = 8
+        ForcePowerDown = 12
+         */
+
+        ElevatePrivileges();
+
+        bool result = ExitWindowsEx(
+            (uint)(ExitFlags.Reboot),
+            (uint)(Reason.SoftwareIssue | Reason.PlannedShutdown));
+        if (!result)
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+    }
+
+    private void Shutdown(object obj)
+    {
+        ElevatePrivileges();
+
+        bool result = ExitWindowsEx(
+            (uint)(ExitFlags.Shutdown | ExitFlags.PowerOff | ExitFlags.Force),
+            (uint)(Reason.HardwareIssue | Reason.PlannedShutdown));
+
+        if (!result)
+            throw new Win32Exception(Marshal.GetLastWin32Error());
     }
 
     private void ChangeAccountPicture(object parameter)

@@ -10,7 +10,10 @@
 
   <ItemGroup>
     <None Remove="Down.png" />
+    <None Remove="svg.png" />
     <None Remove="Up.png" />
+    <None Remove="win8.1_default0.png" />
+    <None Remove="Windows 8.0.png" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,12 +38,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="SharpVectors.Wpf" Version="1.8.5" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.7" />
   </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Down.png" />
+    <Resource Include="svg.png" />
     <Resource Include="Up.png" />
+    <Resource Include="win8.1_default0.png" />
+    <Resource Include="Windows 8.0.png" />
   </ItemGroup>
 
   <ItemGroup>

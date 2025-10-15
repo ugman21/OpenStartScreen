@@ -1,3 +1,4 @@
+using Shell32;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -175,7 +176,18 @@ public partial class MainWindow
     {
         try
         {
+            if (filePath == "explorer[shell]")
+            {
+                Console.WriteLine("Hiding...");
+                this.Hide();
+                //closeAnim();
+                open = false;
+                return;
+            }
             Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });
+            Thread.Sleep(250);
+            this.Hide();
+            open = false;
         }
         catch (Exception ex)
         {
@@ -201,12 +213,20 @@ public partial class MainWindow
     {
         if (sender is Button button && button.Tag is string filePath)
         {
+            //Console.WriteLine("here");
             try
             {
+                //Console.WriteLine("here");
                 Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });
+                Console.WriteLine("[Executing] " +  filePath);
+                Thread.Sleep(250);
+                this.Hide();
+                open = false;
+
             }
             catch (Exception ex)
             {
+                Console.WriteLine("[Execution Err.] " + ex.Message);
                 MessageBox.Show($"Failed to start program: {ex.Message}");
             }
         }
